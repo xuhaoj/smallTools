@@ -3,6 +3,7 @@ package com.jackxu.excelToSql;
 
 import cn.hutool.core.util.StrUtil;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -14,11 +15,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * @author jackxu
@@ -27,11 +25,25 @@ public class excelToSql {
 
 
     public static void main(String[] args) {
-        File excelFile = new File("D:/特权配置(生产) 0412 去掉钻石无忧取消版本.xlsx");
-        String tableName = "tb_home_page_rights";
-        List<String> sqlList = getSqlList(excelFile, 7, tableName);
+        String originAddress = "D:/特权配置(生产) 0413.xlsx";
+        String tableName = "tb_woxie_rights_config";
+        String generateAddress = "D:/生成的sql.txt";
+        int columnCount = 7;
+        int type = 1;
+        if (type == 1) {
+            exportExcel(originAddress, tableName, generateAddress, columnCount);
+        } else if (type == 2) {
+            exportConsole(originAddress, columnCount, tableName);
+        }
+
+    }
+
+
+    public static void exportExcel(String originAddress, String tableName, String generateAddress, int columnCount) {
+        File excelFile = new File(originAddress);
+        List<String> sqlList = getSqlList(excelFile, columnCount, tableName);
         OutputStream outPutStream;
-        File sqlFile = new File("D:/生成的sql.txt");
+        File sqlFile = new File(generateAddress);
         try {
             if (!sqlFile.exists()) {
                 sqlFile.createNewFile();
@@ -55,9 +67,9 @@ public class excelToSql {
     }
 
 
-    public static void homePageToConsole() {
-        File file = new File("D:/excelToDB0407.xlsx");
-        List<String> sqlList = getSqlList(file, 7, "tb_home_page_rights");
+    public static void exportConsole(String originAddress, int columnCount, String tableName) {
+        File file = new File(originAddress);
+        List<String> sqlList = getSqlList(file, columnCount, tableName);
         for (String sql : sqlList) {
             System.out.println(sql);
         }
@@ -94,26 +106,17 @@ public class excelToSql {
                 if (row == null) {
                     continue;
                 }
-                List<String> valueList = new ArrayList<>();
+                List<Object> valueList = new ArrayList<>();
                 for (int i = 0; i < columnCount; i++) {
                     if (row.getCell(i) == null || StrUtil.isBlank((row.getCell(i).toString()))) {
-                        valueList.add("");
-                    } else if (isContainChinese(row.getCell(i).toString()) || row.getCell(i).toString().contains("*")) {
-                        valueList.add(row.getCell(i).toString());
+                        valueList.add(null);
+                    } else if (CellType.NUMERIC == row.getCell(i).getCellTypeEnum()) {
+                        valueList.add(row.getCell(i).getNumericCellValue());
+                    } else if (CellType.STRING == row.getCell(i).getCellTypeEnum()) {
+                        valueList.add(row.getCell(i).getStringCellValue());
                     } else {
-                        // stripTrailingZeros()去除尾部多余的0
-                        // toPlainString()不使用任何指数
-                        valueList.add(new BigDecimal(row.getCell(i).toString()).stripTrailingZeros().toPlainString());
+                        valueList.add("不能识别类型");
                     }
-//					if (row.getCell(i) == null) {
-//						valueList.add("");
-//					} else if (row.getCell(i).toString().contains(".") || isNumeric(row.getCell(i).toString())) {
-//						// stripTrailingZeros()去除尾部多余的0
-//						// toPlainString()不使用任何指数
-//						valueList.add(new BigDecimal(row.getCell(i).toString()).stripTrailingZeros().toPlainString());
-//					} else {
-//						valueList.add(row.getCell(i).toString());
-//					}
                 }
 
                 StringBuilder sql = new StringBuilder();
@@ -128,14 +131,22 @@ public class excelToSql {
                 }
                 sql.append(") VALUES (");
                 for (int i = 0; i < valueList.size(); i++) {
-                    if (StrUtil.isNotBlank(valueList.get(i))) {
+                    if (valueList.get(i) == null) {
+                        sql.append("\'\'");
+                    }
+                    if (valueList.get(i) instanceof String) {
                         sql.append("\'");
                         sql.append(valueList.get(i));
                         sql.append("\'");
-                    } else {
-                        sql.append("\'\'");
                     }
-
+                    if (valueList.get(i) instanceof Double) {
+                        Double valDouble = Double.valueOf(valueList.get(i).toString());
+                        if (isIntegerForDouble(valDouble)) {
+                            sql.append(valDouble.intValue());
+                        } else {
+                            sql.append(valueList.get(i));
+                        }
+                    }
                     if (i < valueList.size() - 1) {
                         sql.append(", ");
                     }
@@ -149,6 +160,14 @@ public class excelToSql {
         return sqlList;
     }
 
+
+    public static boolean isIntegerForDouble(double obj) {
+        // 精度范围
+        double eps = 1e-10;
+        return obj - Math.floor(obj) < eps;
+    }
+
+
     public static Workbook getWorkbook(InputStream inStr, String fileName) throws IOException {
         Workbook wb = null;
         String fileType = fileName.substring(fileName.lastIndexOf("."));
@@ -160,27 +179,4 @@ public class excelToSql {
         return wb;
     }
 
-    /**
-     * 是否包含中文
-     *
-     * @param str
-     * @return
-     */
-    public static boolean isContainChinese(String str) {
-        Pattern p = Pattern.compile("[\u4e00-\u9fa5]");
-        Matcher m = p.matcher(str);
-        if (m.find()) {
-            return true;
-        }
-        return false;
-    }
-
-    public static boolean isNumeric(String str) {
-        Pattern pattern = Pattern.compile("[0-9]*");
-        Matcher isNum = pattern.matcher(str);
-        if (!isNum.matches()) {
-            return false;
-        }
-        return true;
-    }
 }
