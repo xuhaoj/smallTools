@@ -20,7 +20,11 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * @author jackxu
+ */
 public class excelToSql {
+
 
     public static void main(String[] args) {
         File excelFile = new File("D:/特权配置(生产) 0412 去掉钻石无忧取消版本.xlsx");
@@ -29,11 +33,9 @@ public class excelToSql {
         OutputStream outPutStream;
         File sqlFile = new File("D:/生成的sql.txt");
         try {
-            // 处理文件已存在的情况
-            if (sqlFile.exists()) {
-                return;
+            if (!sqlFile.exists()) {
+                sqlFile.createNewFile();
             }
-            sqlFile.createNewFile();
             outPutStream = new FileOutputStream(sqlFile);
             StringBuilder stringBuilder = new StringBuilder();
             for (String sql : sqlList) {
