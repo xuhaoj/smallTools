@@ -25,11 +25,12 @@ public class excelToSql {
 
 
     public static void main(String[] args) {
-        String originAddress = "D:/特权配置(生产) 0413.xlsx";
+        String originAddress = "D:/我携子权益.xlsx";
         String tableName = "tb_woxie_rights_config";
-        String generateAddress = "D:/生成的sql.txt";
-        int columnCount = 7;
+        String generateAddress = "D:/我携子权益sql.txt";
+        int columnCount = 11;
         int type = 1;
+        //1是生产到txt,2是生成到console
         if (type == 1) {
             exportExcel(originAddress, tableName, generateAddress, columnCount);
         } else if (type == 2) {
